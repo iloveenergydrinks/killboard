@@ -1,0 +1,18 @@
+{
+  "name": "citadel-killboard-worker",
+  "private": true,
+  "description": "Records every player ship loss from Citadel's replays into the killboard database.",
+  "scripts": {
+    "start": "node killboard.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "pg": "^8.13.0"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8"
+  }
+}

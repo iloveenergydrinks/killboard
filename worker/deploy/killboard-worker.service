@@ -1,0 +1,34 @@
+[Unit]
+Description=Citadel killboard worker
+Wants=network-online.target
+After=network-online.target
+RequiresMountsFor=/var/lib/citadel-replays
+
+[Service]
+Type=simple
+User=citadel-replays
+Group=citadel-replays
+WorkingDirectory=/srv/killboard-worker/current
+# REPLAY_DATABASE_URL, REPLAY_DATA_ROOT, REPLAY_RUNTIME_REMOTE with its R2 credentials, and
+# KILLBOARD_DATABASE_URL (the killboard's Railway Postgres), shared with the replay dashboard.
+EnvironmentFile=/etc/citadel-replays.env
+Environment=NODE_ENV=production
+Environment=DOTNET_CLI_HOME=/var/lib/citadel-replays
+Environment=NUGET_PACKAGES=/var/lib/citadel-replays/nuget
+ExecStart=/usr/bin/node killboard.js --every 15s --max-live 4 --max-backlog 4
+# Below the dashboard and the kill feed: the backlog can wait, a kill cam cannot.
+Nice=10
+Restart=always
+RestartSec=10
+TimeoutStopSec=30
+# The worker stops its own scanners; a scan cut short is scanned again from its start.
+KillMode=mixed
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/citadel-replays
+
+[Install]
+WantedBy=multi-user.target
