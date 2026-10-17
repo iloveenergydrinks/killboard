@@ -3,7 +3,6 @@
 // the game words them (ItemModifierText.Row), with the stat copy and display rules the game data
 // API serves at /v1/stats.
 
-import { rarityName } from "./art.mjs";
 
 /** DisplayNumberText.FormatNumber: whole numbers from 100 up, one decimal below. */
 export function formatNumber(value) {
@@ -64,7 +63,7 @@ export function createTooltips(stats) {
   /** The tooltip of one grid item of a kill card. */
   function item(source) {
     const facts = source.facts ?? null;
-    const rarity = rarityName(source.rarity ?? "Normal");
+    const rarity = source.rarity ?? "Normal";
     const type =
       source.slotType && source.slotType !== "None"
         ? source.slotType

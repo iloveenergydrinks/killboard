@@ -6,13 +6,6 @@
 //
 // `data` is a GameData (./game-data.ts); every URL is the API's, absolute.
 
-// The Advanced rarity was renamed Augmented (tools/ship-restore/lib/rarity-names.js).
-const RARITY_RENAMES = { Advanced: "Augmented" };
-/** A rarity by its current name, for facts recorded before the rename. */
-export function rarityName(rarity) {
-  return RARITY_RENAMES[rarity] ?? rarity;
-}
-
 /** The 256px twin of an API image URL (the API serves 128px with an @2x file beside it). */
 export function largeImage(url) {
   return url ? url.replace(/\.webp$/, "@2x.webp") : url;
@@ -62,7 +55,7 @@ export function createArt(data) {
   const classOrder = data.shipClasses.map((entry) => entry.name);
   /** BaseModuleDefPrototype.GetIcon: tiered art when authored, else the base icon. */
   const variant = (art, rarity) =>
-    art ? (art[rarityName(rarity ?? "Normal")] ?? art.base) : null;
+    art ? (art[rarity ?? "Normal"] ?? art.base) : null;
   /** A ship by definition id: a hull a pilot can fly, else an NPC ship or boss. */
   const shipEntry = (def) => (def ? (data.hulls.get(def) ?? data.npcs.get(def)) : null);
   const shipImage = (def, rarity) =>
