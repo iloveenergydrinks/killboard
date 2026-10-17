@@ -5,6 +5,8 @@ import { Art, Chevron } from "./components";
 import { formatCause } from "./format";
 
 export type Filters = {
+  zoneId?: string;
+  // A zone by name, from links made before zones had ids.
   zone?: string;
   tier?: number;
   hull?: string;
@@ -24,7 +26,7 @@ export type Filters = {
 };
 
 export type FilterOptions = {
-  zones: string[];
+  zones: { id: string; name: string; isTournament: boolean }[];
   // Every ship the board names, with the id of its hull where it has one.
   hulls: { name: string; def: string | null }[];
   classes: string[];
@@ -182,10 +184,14 @@ export function FilterBar({
           <input type="hidden" name="pilot" value={filters.pilot} />
         ) : null}
         <Select
-          name="zone"
+          name="zoneId"
           label="Zone"
-          value={filters.zone}
-          options={options.zones.map((zone) => [zone, zone])}
+          value={filters.zoneId}
+          options={options.zones.map((zone) => [
+            zone.id,
+            // Event routes reuse public zone names.
+            zone.isTournament ? `${zone.name} · event` : zone.name,
+          ])}
         />
         <Select
           name="tier"

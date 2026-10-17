@@ -96,14 +96,14 @@ export default async function LeaderboardsPage({
           <TallyList
             rows={boards.deadliestHulls}
             href={(row) => hullHref(row.name)}
-            image={(row) => art.hull(row.hullDef)}
+            image={(row) => art.hull(row.hullArt)}
           />
         </section>
         <section>
           <SectionHead title="Deadliest zones" />
           <TallyList
             rows={boards.deadliestZones}
-            href={(row) => zoneHref(row.name)}
+            href={(row) => zoneHref(row.zoneId, row.name)}
           />
         </section>
         <section>

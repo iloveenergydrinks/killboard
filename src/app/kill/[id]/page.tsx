@@ -86,9 +86,8 @@ function KillView({
   const { victim, attackers } = kill;
   const loss = kill.deathCause === "ReconnectLoss";
   const hull = victim.hull;
-  const victimArt = art.ship({ name: hull.name, def: hull.def ?? undefined, rarity: victim.rarity });
-  const shipOf = (ref: { name: string; def: string | null } | null) =>
-    ref ? art.ship({ name: ref.name, def: ref.def ?? undefined }) : null;
+  const victimArt = art.ship(hull);
+  const shipOf = (ref: { name: string; art: string | null } | null) => (ref ? art.ship(ref) : null);
   const byDamage = [...attackers].sort((a, b) => b.damage - a.damage);
   const finalBlow = attackers.find((attacker) => attacker.isFinalBlow) ?? null;
   const topDamage = byDamage[0] ?? null;
@@ -121,7 +120,7 @@ function KillView({
             <span className="kb-label kb-signal">{loss ? "Loss" : "Kill"}</span>
             <span className="kb-label">{formatUtc(kill.occurredAt)}</span>
             {kill.zone.name ? (
-              <Link href={zoneHref(kill.zone.name)} className="kb-label">
+              <Link href={zoneHref(kill.zone.id, kill.zone.name)} className="kb-label">
                 {formatZone(kill.zone.name, kill.zone.tier, kill.zone.isTravelLane)}
               </Link>
             ) : null}

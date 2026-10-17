@@ -69,8 +69,8 @@ export default async function ShipPage({
         <div className="kb-record-stage">
           <Art
             src={art.hull(
-              [...data.hulls.values()].find((hull) => hull.name === name)?.def ??
-                kills[0]?.hullDef,
+              [...data.hulls.values()].find((hull) => hull.name === name)?.art?.base ??
+                kills[0]?.victimShip?.art,
             )}
             alt={name}
           />

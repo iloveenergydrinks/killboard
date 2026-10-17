@@ -1,8 +1,7 @@
-// The killboard's game data: names, art, hull roster and stat copy, read at runtime from the public
-// game data API (https://api.thecitadel.com, tools/game-data-api) instead of from the Unity project.
-//
-// Kill cards name what they show by the game's definition id (the decimal asset GUID, `def`), which
-// is also how the API names an item, hull, NPC, cipher or artifact. Nothing here matches by name.
+// The killboard's game data: the hull roster, ship classes and roles, death causes, breach tiers and
+// zones, read at runtime from the public game data API (https://api.thecitadel.com,
+// tools/game-data-api) instead of from the Unity project. Kills carry the art of what they show and
+// their modifiers' wording, so the item, NPC, artifact, cipher and stat lists are not needed here.
 //
 // Caching, for a Vercel serverless instance:
 //  - One copy per instance in module memory, shared by every request it serves, for one build
@@ -10,25 +9,21 @@
 //  - A copy older than the API's own max-age (5 minutes) is revalidated with `If-None-Match`, one
 //    conditional request per list, never per page view; a 304 costs the API no body. Concurrent
 //    requests share one revalidation.
-//  - The six lists are only ever swapped in together and only when they report the same build, so
+//  - The lists are only ever swapped in together and only when they report the same build, so
 //    a page never mixes two builds (a deploy mid-refresh makes one retry, then keeps the old copy).
 //  - Any error keeps serving the last good copy. With no copy at all (a cold instance and an API
 //    outage) the data is empty, every image is a named placeholder, and the next attempt waits
 //    FAILURE_BACKOFF_MS so a down API is not hammered by every request.
-//  - A cold instance costs six requests once, well inside the API's bucket of 60.
+//  - A cold instance costs one request per list once, well inside the API's bucket of 60.
 
 const DEFAULT_API_URL = "https://api.thecitadel.com";
 const LISTS = [
-  "items",
   "hulls",
-  "npcs",
-  "stats",
-  "artifacts",
-  "ciphers",
   "ship-classes",
   "ship-roles",
   "death-causes",
   "breach-tiers",
+  "zones",
 ] as const;
 type List = (typeof LISTS)[number];
 
@@ -40,13 +35,7 @@ const STALE_WAIT_MS = 1500;
 
 /** Image URLs by the rarity variant the game authors, absolute; `base` always exists. */
 export type ArtKeys = { base: string } & Record<string, string>;
-export type Stat = {
-  id: string;
-  label: string;
-  lowerIsBetter: boolean;
-  integer: boolean;
-  invertedSign: boolean;
-};
+export type Zone = { id: string; name: string; isTournament: boolean };
 export type Hull = {
   def: string;
   name: string;
@@ -54,25 +43,11 @@ export type Hull = {
   role: string | null;
   art: ArtKeys | null;
 };
-export type Named = { def: string; name: string; art: ArtKeys | null };
-export type Artifact = Named & { item: string | null };
-export type Npc = {
-  id: string;
-  name: string;
-  kind: string;
-  class: string | null;
-  art: ArtKeys | null;
-};
 
 /** One build's data, indexed by definition id. */
 export type GameData = {
   build: string | null;
-  items: Map<string, Named>;
   hulls: Map<string, Hull>;
-  npcs: Map<string, Npc>;
-  artifacts: Map<string, Artifact>;
-  ciphers: Map<string, Named>;
-  stats: Stat[];
   /** ShipClass in game order, each with its overlay mark. */
   shipClasses: { name: string; art: ArtKeys | null }[];
   /** The mark for a ship of no known class. */
@@ -83,21 +58,19 @@ export type GameData = {
   deathCauses: string[];
   /** Breach tiers by index, with the names the game gives them. */
   breachTiers: { index: number; name: string }[];
+  /** The zones a kill can happen in, public regions first, by the id a kill's zone carries. */
+  zones: Zone[];
 };
 
 export const NO_GAME_DATA: GameData = {
   build: null,
-  items: new Map(),
   hulls: new Map(),
-  npcs: new Map(),
-  artifacts: new Map(),
-  ciphers: new Map(),
-  stats: [],
   shipClasses: [],
   unknownClassArt: null,
   shipRoles: [],
   deathCauses: [],
   breachTiers: [],
+  zones: [],
 };
 
 type Options = {
@@ -152,7 +125,7 @@ export function createGameData(options: Options = {}) {
     return { etag: response.headers.get("etag"), build, body: (await response.json()) as Body };
   }
 
-  /** All six lists of one build, or an error. A deploy in the middle gets one more try. */
+  /** All the lists of one build, or an error. A deploy in the middle gets one more try. */
   async function readAll(): Promise<Map<List, Cached>> {
     for (let attempt = 0; ; attempt++) {
       const lists = await Promise.all(LISTS.map(async (list) => [list, await read(list)] as const));
@@ -218,29 +191,8 @@ function index(lists: Map<List, Cached>, baseUrl: string): GameData {
     ((lists.get(list)!.body[key] as Record<string, any>[] | undefined) ?? []).filter(
       (row) => row && typeof row === "object",
     );
-  const named = (list: List, key: string) =>
-    new Map(
-      rows(list, key).map((row) => [
-        String(row.def),
-        { def: String(row.def), name: String(row.name), art: absolute(baseUrl, row.art) } as Named,
-      ]),
-    );
-  const artifacts = new Map(
-    rows("artifacts", "artifacts").map((row) => [
-      String(row.def),
-      {
-        def: String(row.def),
-        name: String(row.name),
-        item: row.item == null ? null : String(row.item),
-        art: absolute(baseUrl, row.art),
-      } as Artifact,
-    ]),
-  );
   return {
-    build: lists.get("items")!.build,
-    items: named("items", "items"),
-    ciphers: named("ciphers", "ciphers"),
-    artifacts,
+    build: lists.get("hulls")!.build,
     hulls: new Map(
       rows("hulls", "hulls").map((row) => [
         String(row.def),
@@ -253,18 +205,6 @@ function index(lists: Map<List, Cached>, baseUrl: string): GameData {
         } as Hull,
       ]),
     ),
-    npcs: new Map(
-      rows("npcs", "npcs").map((row) => [
-        String(row.id),
-        {
-          id: String(row.id),
-          name: String(row.name),
-          kind: String(row.kind),
-          class: row.class == null ? null : String(row.class),
-          art: absolute(baseUrl, row.art),
-        } as Npc,
-      ]),
-    ),
     shipClasses: rows("ship-classes", "shipClasses").map((row) => ({
       name: String(row.name),
       art: absolute(baseUrl, row.art),
@@ -272,16 +212,14 @@ function index(lists: Map<List, Cached>, baseUrl: string): GameData {
     unknownClassArt: absolute(baseUrl, lists.get("ship-classes")!.body.unknownArt as any),
     shipRoles: strings(lists, "ship-roles", "shipRoles"),
     deathCauses: strings(lists, "death-causes", "deathCauses"),
+    zones: rows("zones", "zones").map((row) => ({
+      id: String(row.id),
+      name: String(row.name),
+      isTournament: row.isTournament === true,
+    })),
     breachTiers: rows("breach-tiers", "breachTiers")
       .map((row) => ({ index: Number(row.index), name: String(row.name) }))
       .filter((tier) => Number.isInteger(tier.index))
       .sort((a, b) => a.index - b.index),
-    stats: rows("stats", "stats").map((row) => ({
-      id: String(row.id),
-      label: String(row.label),
-      lowerIsBetter: row.lowerIsBetter === true,
-      integer: row.integer === true,
-      invertedSign: row.invertedSign === true,
-    })),
   };
 }

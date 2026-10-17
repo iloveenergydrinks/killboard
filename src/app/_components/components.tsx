@@ -13,22 +13,20 @@ import {
 
 export type CardShip = {
   name: string;
-  // The game's definition id of the ship, which finds its art; absent on older kills.
+  // The game's definition id of the ship; absent on older kills.
   def?: string;
   shipClass: string;
   buildRating: number;
   rarity?: string | null;
-  quality?: string | null;
-  icon?: {
-    prototype?: string | null;
-    rarity?: string;
-    npcHull?: string | null;
-  } | null;
+  // Its image as the API picked it (a victim's at its rarity); null when the API has none.
+  art?: string | null;
 };
 
 export type KillRow = {
   id: string;
   occurredAt: string;
+  // The zone's id, as /v1/zones lists it; null on kills recorded before zones had ids.
+  zoneId: string | null;
   regionName: string;
   tier: number;
   isTravelLane: boolean;
@@ -36,7 +34,6 @@ export type KillRow = {
   victimUserId: string;
   victimName: string;
   hullName: string;
-  hullDef: string | null;
   hullClass: string;
   victimBr: number;
   valueTotal: number | null;
@@ -47,7 +44,6 @@ export type KillRow = {
   finalBlowName: string | null;
   finalBlowUserId: string | null;
   finalBlowHull: string | null;
-  finalBlowHullDef: string | null;
   battleId: string | null;
   viewerUrl: string | null;
   victimShip: CardShip | null;
@@ -61,14 +57,17 @@ export type Tally = {
   value?: number;
   // The ship the pilot flies (or loses) most, for their row's image.
   hull?: string | null;
-  // The definition id of that ship.
-  hullDef?: string | null;
+  // That ship's image, as the API served it.
+  hullArt?: string | null;
+  // For a zone's row, its id.
+  zoneId?: string | null;
 };
 
 export const killHref = (id: string) => `/kill/${enc(id)}`;
 export const pilotHref = (userId: string) => `/pilot/${enc(userId)}`;
 export const hullHref = (hull: string) => `/ship/${enc(hull)}`;
-export const zoneHref = (zone: string) => `/zone/${enc(zone)}`;
+/** A zone's page, by its id; by its name for a zone recorded without one. */
+export const zoneHref = (id: string | null | undefined, name: string) => `/zone/${enc(id || name)}`;
 export const battleHref = (id: string) => `/battle/${enc(id)}`;
 
 export function Chevron({
@@ -104,12 +103,8 @@ export function Art({
 }
 
 /** The render of the ship a kill card names, or of the hull a row records when the build kept no card. */
-export function shipArt(
-  art: KillboardArt,
-  ship: CardShip | null | undefined,
-  hullDef?: string | null,
-) {
-  return ship ? art.ship(ship) : art.hull(hullDef);
+export function shipArt(art: KillboardArt, ship: CardShip | null | undefined) {
+  return art.ship(ship);
 }
 
 export function SectionHead({
@@ -150,7 +145,7 @@ export function KillLedger({
             aria-label={`${kill.victimName} lost a ${kill.hullName}`}
           />
           <Art
-            src={shipArt(art, kill.victimShip, kill.hullDef)}
+            src={shipArt(art, kill.victimShip)}
             alt={kill.hullName}
           />
           <div className="kb-kill-victim">
@@ -174,7 +169,7 @@ export function KillLedger({
               <>
                 <Chevron double />
                 <Art
-                  src={shipArt(art, kill.finalBlowShip, kill.finalBlowHullDef)}
+                  src={shipArt(art, kill.finalBlowShip)}
                   alt={kill.finalBlowHull ?? ""}
                 />
                 <div className="kb-killer-text">
@@ -199,7 +194,7 @@ export function KillLedger({
           </div>
           <div className="kb-kill-where">
             {kill.regionName ? (
-              <Link href={zoneHref(kill.regionName)} className="kb-kill-zone">
+              <Link href={zoneHref(kill.zoneId, kill.regionName)} className="kb-kill-zone">
                 {formatZone(kill.regionName, kill.tier, kill.isTravelLane)}
               </Link>
             ) : (
@@ -234,13 +229,14 @@ export function KillLedger({
 export type BattleRow = {
   id: string;
   startedAt: string;
+  zoneId: string | null;
   regionName: string;
   killCount: number;
   valueTotal: number;
   pilotCount: number;
   // Every ship lost, in kill order, and each other hull that dealt damage.
-  lost: { hull: string; hullDef: string | null; ship: CardShip | null }[];
-  attackers: { hull: string; def: string | null }[];
+  lost: { hull: string; ship: CardShip | null }[];
+  attackers: { hull: string; art: string | null }[];
 };
 
 /** Battles as rows: kills, where and when, the ships lost and the hulls that fought, the value. */
@@ -279,15 +275,15 @@ export function BattleLedger({
                 {battle.lost.map((ship, index) => (
                   <Art
                     key={`lost-${index}`}
-                    src={shipArt(art, ship.ship, ship.hullDef)}
+                    src={shipArt(art, ship.ship)}
                     alt={`${ship.hull} lost`}
                     className="is-lost"
                   />
                 ))}
                 {battle.attackers.map((attacker, index) => (
                   <Art
-                    key={`${attacker.def ?? attacker.hull}-${index}`}
-                    src={art.hull(attacker.def)}
+                    key={`${attacker.hull}-${index}`}
+                    src={art.hull(attacker.art)}
                     alt={attacker.hull}
                   />
                 ))}
@@ -436,4 +432,4 @@ export function Readouts({
 
 /** A ranked pilot's most-flown ship, for their row's image. */
 export const pilotShipArt = (art: KillboardArt, row: Tally) =>
-  art.hull(row.hullDef);
+  art.hull(row.hullArt);

@@ -1,8 +1,7 @@
 // A kill card module's tooltip, in the game's item tooltip shape (CurrentItemTooltip's
-// TooltipState: Header and Rows), from what the kill recorded about it. Modifiers read the way
-// the game words them (ItemModifierText.Row), with the stat copy and display rules the game data
-// API serves at /v1/stats.
-
+// TooltipState: Header and Rows), from what the kill recorded about it. Each modifier comes from
+// the game data API already worded the way the game words it (ItemModifierText.Row: label, signed
+// text and tone); the rows only a kill has (destroyed or dropped, quantity, ports) are the site's.
 
 /** DisplayNumberText.FormatNumber: whole numbers from 100 up, one decimal below. */
 export function formatNumber(value) {
@@ -13,48 +12,16 @@ export function formatNumber(value) {
     : String(rounded);
 }
 
-export function formatSignedNumber(value) {
-  const text = formatNumber(value);
-  return value > 0 ? `+${text}` : text;
-}
-
-/**
- * `stats` is the game data API's /v1/stats list: each stat's label, whether it reads as a whole
- * number, whether lower is better, and whether a multiplier shows with its sign inverted (a faster
- * fire rate is a lower cycle duration).
- */
-export function createTooltips(stats) {
-  const byId = new Map(stats.map((stat) => [stat.id, stat]));
-  // A stat newer than the data (or an API that could not be reached) shows its own name.
-  const label = (stat) => byId.get(stat)?.label ?? String(stat);
-  const inverts = (stat, operation) =>
-    operation === "Multiply" && byId.get(stat)?.invertedSign === true;
-  const isInteger = (stat) => byId.get(stat)?.integer === true;
-  const lowerIsBetter = (stat) => byId.get(stat)?.lowerIsBetter === true;
-
-  /** ItemModifierText.Row: the signed value, percent for a multiplier or a resistance, and its tone. */
+export function createTooltips() {
+  /**
+   * A modifier's row as the API words it, badged with its tier and accented when fractured. A row
+   * with no value (a name-only stat, or one the live build does not know) shows its label alone.
+   */
   function modifierRow(modifier) {
-    const { stat, operation, value } = modifier;
-    const magnitude = operation === "Multiply" ? value - 1 : value;
-    let shown;
-    if (operation === "Multiply")
-      shown = (inverts(stat, operation) ? 1 - value : value - 1) * 100;
-    else if (operation === "DamageReduction") shown = value * 100;
-    else shown = isInteger(stat) ? Math.round(value) : value;
-    let text = formatSignedNumber(shown);
-    if (operation === "Multiply" || operation === "DamageReduction")
-      text += "%";
-    const higherIsBetter = !lowerIsBetter(stat);
-    const tone =
-      magnitude === 0
-        ? "Neutral"
-        : magnitude > 0 === higherIsBetter
-          ? "Positive"
-          : "Negative";
     return {
-      Label: label(stat),
-      Value: text,
-      Tone: tone,
+      Label: modifier.label ?? String(modifier.stat),
+      ...(modifier.text != null ? { Value: modifier.text } : {}),
+      Tone: modifier.tone ?? "Neutral",
       ...(modifier.tier > 0 ? { Badge: `T${modifier.tier}` } : {}),
       ...(modifier.isFractured ? { Accent: "Harmonic" } : {}),
     };

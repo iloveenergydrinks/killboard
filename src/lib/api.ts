@@ -43,7 +43,8 @@ async function get<T>(path: string, query?: Query): Promise<T | null> {
 
 // ── The API's shapes (tools/game-data-api/openapi/openapi.json) ─────────────────────────────
 
-export type HullRef = { def: string | null; name: string; class: string | null };
+// `art` is the hull's image as a full URL (a victim's at its rarity), or null when the live build has none.
+export type HullRef = { def: string | null; name: string; class: string | null; art: string | null };
 type ZoneRef = { id: string | null; name: string };
 type KillZone = ZoneRef & { tier: number; isTravelLane: boolean };
 type Party = { pilotId: string | null; name: string; hull: HullRef | null };
@@ -79,6 +80,11 @@ export type ItemModifier = {
   value: number | string;
   tier: number | null;
   isFractured: boolean;
+  // The row as the game words it: the stat's label, the signed value in its units (null for a
+  // name-only row) and whether it reads as good or bad.
+  label: string;
+  text: string | null;
+  tone: "Positive" | "Negative" | "Neutral";
 };
 export type ItemPort = {
   row: number;
@@ -86,6 +92,7 @@ export type ItemPort = {
   direction: string;
   state: string;
   cipher: { def: string | null; name: string; rarity?: string | null } | null;
+  cipherArt: string | null;
 };
 export type ContainerItem = {
   def: string | null;
@@ -104,6 +111,8 @@ export type ContainerItem = {
   pointRating: number | null;
   modifiers: ItemModifier[];
   ports: ItemPort[];
+  // The image the game shows for this item (its artifact's, its rarity's or its base), as a full URL.
+  art: string | null;
 };
 export type Container = { rows: number; columns: number; slots: string[]; items: ContainerItem[] };
 export type Attacker = {
@@ -183,7 +192,7 @@ type Leaderboards = {
 
 // ── Rows the pages draw ──────────────────────────────────────────────────────────────────────
 
-/** A ship as the art lookup reads it: its name, definition id, class and the rarity of its render. */
+/** A ship as a card draws it: its name, definition id, class, rarity and the image the API picked. */
 function ship(hull: HullRef | null | undefined, rarity?: string | null, buildRating = 0) {
   if (!hull) return null;
   return {
@@ -192,6 +201,7 @@ function ship(hull: HullRef | null | undefined, rarity?: string | null, buildRat
     shipClass: hull.class ?? "",
     buildRating,
     rarity: rarity ?? null,
+    art: hull.art,
   };
 }
 
@@ -199,6 +209,7 @@ function killRow(kill: KillSummary) {
   return {
     id: kill.id,
     occurredAt: kill.occurredAt,
+    zoneId: kill.zone.id,
     regionName: kill.zone.name,
     tier: kill.zone.tier,
     isTravelLane: kill.zone.isTravelLane,
@@ -206,7 +217,6 @@ function killRow(kill: KillSummary) {
     victimUserId: kill.victim.pilotId,
     victimName: kill.victim.name,
     hullName: kill.victim.hull.name,
-    hullDef: kill.victim.hull.def,
     hullClass: kill.victim.hull.class ?? "",
     victimBr: kill.victim.buildRating,
     valueTotal: kill.value?.total ?? null,
@@ -217,7 +227,6 @@ function killRow(kill: KillSummary) {
     finalBlowName: kill.finalBlow?.name ?? null,
     finalBlowUserId: kill.finalBlow?.pilotId ?? null,
     finalBlowHull: kill.finalBlow?.hull?.name ?? null,
-    finalBlowHullDef: kill.finalBlow?.hull?.def ?? null,
     battleId: kill.battleId,
     viewerUrl: kill.links.killCam,
     clipUrl: kill.links.clip,
@@ -232,7 +241,7 @@ const pilotTally = (row: PilotCount, n = row.count) => ({
   n,
   value: row.value,
   hull: row.hull?.name ?? null,
-  hullDef: row.hull?.def ?? null,
+  hullArt: row.hull?.art ?? null,
 });
 
 const hullTally = (row: HullCount) => ({
@@ -240,7 +249,7 @@ const hullTally = (row: HullCount) => ({
   name: row.hull.name,
   n: row.count,
   hull: row.hull.name,
-  hullDef: row.hull.def,
+  hullArt: row.hull.art,
 });
 
 function battleRow(battle: BattleSummary) {
@@ -249,18 +258,18 @@ function battleRow(battle: BattleSummary) {
     id: battle.id,
     startedAt: battle.startedAt,
     endedAt: battle.endedAt,
+    zoneId: battle.zone.id,
     regionName: battle.zone.name,
     killCount: battle.killCount,
     valueTotal: battle.valueDestroyed,
     pilotCount: battle.pilotCount,
     lost: battle.lost.map((each) => ({
       hull: each.hull.name,
-      hullDef: each.hull.def,
       ship: ship(each.hull),
     })),
     attackers: battle.attackerHulls
       .filter((hull) => !lostNames.has(hull.name))
-      .map((hull) => ({ hull: hull.name, def: hull.def })),
+      .map((hull) => ({ hull: hull.name, art: hull.art })),
   };
 }
 
@@ -295,17 +304,8 @@ export async function killTotals(filters: Filters) {
   };
 }
 
-/**
- * The zones the filter form offers. The API lists no zones of its own, so they are those the
- * all-time leaderboard ranks; classes, causes, tiers and ships come from the game data.
- */
-export async function filterZones() {
-  const boards = await get<Leaderboards>("/v1/leaderboards", { window: "all" });
-  return (boards?.deadliestZones ?? []).map((row) => row.zone.name).sort();
-}
-
 /** A ship's or a zone's record: losses, value lost, pilots, average rating, PvP and top killers. */
-export async function getGroupStats({ column, value }: { column: "hull" | "zone"; value: string }) {
+export async function getGroupStats({ column, value }: { column: "hull" | "zone" | "zoneId"; value: string }) {
   const totals = await killTotals({ [column]: value });
   if (!totals.kills) return null;
   return {
@@ -346,7 +346,7 @@ export async function getBattle(id: string) {
       userId: pilot.pilotId,
       name: pilot.name,
       hulls: pilot.hulls.map((hull) => hull.name).join(", "),
-      hullDef: pilot.hulls[0]?.def ?? null,
+      hullArt: pilot.hulls[0]?.art ?? null,
       kills: pilot.kills,
       losses: pilot.losses,
       damage: pilot.damage,
@@ -386,6 +386,7 @@ export async function getLeaderboards(window: keyof typeof WINDOWS) {
     biggestLosses: (boards?.biggestLosses ?? []).map(killRow),
     deadliestZones: (boards?.deadliestZones ?? []).map((row) => ({
       userId: null,
+      zoneId: row.zone.id,
       name: row.zone.name,
       n: row.count,
       value: row.value,

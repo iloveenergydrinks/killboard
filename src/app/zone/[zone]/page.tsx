@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import { loadGameArt } from "#/lib/art-server";
+import type { Zone } from "#/lib/game-data";
 import { filterHref, parseFilters } from "#/lib/filters.mjs";
 import { getGroupStats, listKills } from "#/lib/api";
 import {
@@ -24,13 +25,23 @@ export const dynamic = "force-dynamic";
 type Params = Promise<{ zone: string }>;
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
+/**
+ * The zone a page's path names: by its id, as /v1/zones lists it, else by the name a kill recorded
+ * before zones had ids. Zone ids are lowercase words joined by underscores; names are not.
+ */
+function findZone(zones: Zone[], key: string) {
+  const zone = zones.find((each) => each.id === key) ?? null;
+  return { zone, byId: zone != null || /^[a-z0-9_]+$/.test(key) };
+}
+
 export async function generateMetadata({
   params,
 }: {
   params: Params;
 }): Promise<Metadata> {
-  const name = decodeURIComponent((await params).zone);
-  return { title: name };
+  const key = decodeURIComponent((await params).zone);
+  const { data } = await loadGameArt();
+  return { title: findZone(data.zones, key).zone?.name || key };
 }
 
 export default async function ZonePage({
@@ -40,16 +51,20 @@ export default async function ZonePage({
   params: Params;
   searchParams: SearchParams;
 }) {
-  const name = decodeURIComponent((await params).zone);
-  const [stats, { art }] = await Promise.all([
-    getGroupStats({ column: "zone", value: name }),
-    loadGameArt(),
-  ]);
+  const key = decodeURIComponent((await params).zone);
+  const { art, data } = await loadGameArt();
+  const { zone, byId } = findZone(data.zones, key);
+  // A link by name to a public zone moves to the zone's id: event routes reuse public names.
+  const named = byId ? null : data.zones.find((each) => each.name === key && !each.isTournament);
+  if (named) permanentRedirect(zoneHref(named.id, named.name));
+  const column = byId ? "zoneId" : "zone";
+  const name = zone?.name || key;
+  const stats = await getGroupStats({ column, value: key });
   const killerArt = (row: Tally) => pilotShipArt(art, row);
   if (!stats) notFound();
-  const filters = { ...parseFilters(await searchParams), zone: name };
+  const filters = { ...parseFilters(await searchParams), [column]: key };
   const { kills, nextCursor } = await listKills(filters);
-  const path = zoneHref(name);
+  const path = zoneHref(byId ? key : null, key);
   const stats_items = [
     { label: "Lost", value: formatNumber(stats.losses), tone: "loss" as const },
     {
@@ -73,7 +88,7 @@ export default async function ZonePage({
               href={filterHref(
                 "/",
                 { sort: "recent", page: 1 },
-                { zone: name },
+                { [column]: key },
               )}
               className="kb-label"
             >
@@ -92,7 +107,7 @@ export default async function ZonePage({
             paged={Boolean(filters.cursor)}
             nextCursor={nextCursor}
             href={(cursor) =>
-              filterHref(path, { ...filters, zone: null }, { cursor })
+              filterHref(path, { ...filters, [column]: null }, { cursor })
             }
           />
         </section>

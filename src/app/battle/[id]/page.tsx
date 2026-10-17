@@ -21,7 +21,7 @@ type Pilot = {
   userId: string;
   name: string;
   hulls: string;
-  hullDef: string | null;
+  hullArt: string | null;
   kills: number;
   losses: number;
   damage: number;
@@ -76,7 +76,7 @@ export default async function BattlePage({ params }: { params: Params }) {
           </div>
           <h1 className="kb-headline">
             {battle.regionName ? (
-              <Link href={zoneHref(battle.regionName)}>
+              <Link href={zoneHref(battle.zoneId, battle.regionName)}>
                 {battle.regionName}
               </Link>
             ) : (
@@ -115,7 +115,7 @@ export default async function BattlePage({ params }: { params: Params }) {
                 <li key={pilot.userId}>
                   <Link href={pilotHref(pilot.userId)} className="kb-row">
                     <span className="kb-row-lead">
-                      <Art src={art.hull(pilot.hullDef)} alt={hull} />
+                      <Art src={art.hull(pilot.hullArt)} alt={hull} />
                     </span>
                     <span style={{ minWidth: 0 }}>
                       <span

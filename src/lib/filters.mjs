@@ -7,7 +7,7 @@ export const SORTS = ["recent", "value", "br"];
 export const KINDS = ["pvp", "pve"];
 export const SIZES = ["solo", "gang"];
 
-const TEXT_FIELDS = ["zone", "hull", "class", "cause", "pilot"];
+const TEXT_FIELDS = ["zoneId", "zone", "hull", "class", "cause", "pilot"];
 const INTEGER_FIELDS = ["tier", "brMin", "brMax", "valueMin", "valueMax"];
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const CURSOR = /^[\w-]{1,200}$/;

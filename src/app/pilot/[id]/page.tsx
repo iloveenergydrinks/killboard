@@ -59,7 +59,7 @@ export default async function PilotPage({
   const { kills, nextCursor } = await listKills(filters);
   const signatureRow = pilot.hullsFlown[0] ?? pilot.hullsLost[0] ?? null;
   const signature = signatureRow?.name ?? null;
-  const hullArt = (row: { hullDef?: string | null }) => art.hull(row.hullDef);
+  const hullArt = (row: { hullArt?: string | null }) => art.hull(row.hullArt);
   const flownArt = (row: Tally) => pilotShipArt(art, row);
 
   return (
@@ -67,7 +67,7 @@ export default async function PilotPage({
       <section className="kb-shell kb-record">
         <div className="kb-record-stage">
           <Art
-            src={art.hull(signatureRow?.hullDef)}
+            src={art.hull(signatureRow?.hullArt)}
             alt={signature ?? ""}
           />
         </div>

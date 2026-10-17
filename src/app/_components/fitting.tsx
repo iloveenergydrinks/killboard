@@ -124,12 +124,7 @@ export function FittingGrid({
             aria-label={`${item.name}${item.isDestroyed ? ", destroyed" : ", dropped"}`}
           >
             <img
-              src={
-                art.item(
-                  { def: item.def, rarity: item.rarity, artifactDef: item.artifact },
-                  item.name,
-                ) ?? undefined
-              }
+              src={art.item(item.art, item.name) ?? undefined}
               alt=""
               loading="lazy"
               decoding="async"
