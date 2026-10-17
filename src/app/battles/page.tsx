@@ -12,7 +12,8 @@ export const metadata = { title: "Battles" };
 
 export default async function BattlesPage() {
   const [battles, { art }] = await Promise.all([
-    listBattles({ limit: 100 }).then((page) => page.battles),
+    // The most /v1/battles returns in one page.
+    listBattles({ limit: 50 }).then((page) => page.battles),
     loadGameArt(),
   ]);
   return (
