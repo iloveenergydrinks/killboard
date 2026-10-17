@@ -8,27 +8,6 @@
 
 // The Advanced rarity was renamed Augmented (tools/ship-restore/lib/rarity-names.js).
 const RARITY_RENAMES = { Advanced: "Augmented" };
-// How the roles and ship classes read in the hull picker; the API lists hulls unordered.
-const ROLE_ORDER = [
-  "Interceptor",
-  "Destroyer",
-  "Scout",
-  "Sentinel",
-  "Artillery",
-  "Support",
-  "Hauler",
-];
-const CLASS_ORDER = ["Frigate", "Cruiser", "Dreadnought"];
-// The ship class marks are the site's own: the API serves no class art (it should, later). The
-// webp files are a one-off conversion of the game's ShipClass sprites (Assets/Art/ShipIndicator:
-// Frigate/Cruiser/Dreadnaught Enemy.png, SquareIcon.png), trimmed and resized to 64px.
-const CLASS_ICONS = {
-  Frigate: "/ship-class/frigate.webp",
-  Cruiser: "/ship-class/cruiser.webp",
-  Dreadnought: "/ship-class/dreadnought.webp",
-};
-const UNKNOWN_CLASS_ICON = "/ship-class/unknown.webp";
-
 /** A rarity by its current name, for facts recorded before the rename. */
 export function rarityName(rarity) {
   return RARITY_RENAMES[rarity] ?? rarity;
@@ -79,6 +58,8 @@ function prototypeName(prototype) {
 }
 
 export function createArt(data) {
+  // The game's class order, from the API; a hull with no role is grouped under its class.
+  const classOrder = data.shipClasses.map((entry) => entry.name);
   /** BaseModuleDefPrototype.GetIcon: tiered art when authored, else the base icon. */
   const variant = (art, rarity) =>
     art ? (art[rarityName(rarity ?? "Normal")] ?? art.base) : null;
@@ -116,8 +97,8 @@ export function createArt(data) {
      */
     hullGroups(named = []) {
       const order = (group) => {
-        const role = ROLE_ORDER.indexOf(group);
-        return role >= 0 ? role : ROLE_ORDER.length + Math.max(CLASS_ORDER.indexOf(group), 0);
+        const role = data.shipRoles.indexOf(group);
+        return role >= 0 ? role : data.shipRoles.length + Math.max(classOrder.indexOf(group), 0);
       };
       const groups = new Map();
       // The roster lists a ship once by name, though the data may name it twice.
@@ -159,7 +140,8 @@ export function createArt(data) {
     },
     /** The mark of a ship class; the unknown contact for a class the site has no mark for. */
     shipClass(shipClass) {
-      return CLASS_ICONS[shipClass] ?? UNKNOWN_CLASS_ICON;
+      const mark = data.shipClasses.find((entry) => entry.name === shipClass)?.art ?? data.unknownClassArt;
+      return mark?.base ?? null;
     },
     /**
      * The kill card with a URL on every icon it names, as the kill feed's card renderer gives the

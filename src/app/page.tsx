@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { loadGameArt } from "#/lib/art-server";
 import { filterHref, parseFilters } from "#/lib/filters.mjs";
 import {
-  filterOptions,
+  filterZones,
   killTotals,
   listBattles,
   listKills,
@@ -37,13 +37,20 @@ export default async function KillFeedPage({
     )
   )
     redirect(filterHref("/", filters, { cursor: filters.cursor }));
-  const [{ kills, nextCursor }, totals, options, battles, { art }] = await Promise.all([
+  const [{ kills, nextCursor }, totals, zones, battles, { art, data }] = await Promise.all([
     listKills(filters),
     killTotals(filters),
-    filterOptions(),
+    filterZones(),
     listBattles({ limit: 8 }).then((page) => page.battles),
     loadGameArt(),
   ]);
+  const options = {
+    zones,
+    hulls: [],
+    classes: data.shipClasses.map((shipClass) => shipClass.name),
+    causes: data.deathCauses,
+    tiers: data.breachTiers,
+  };
   const filtered = Object.keys(filters).some(
     (key) => key !== "sort" && key !== "cursor",
   );

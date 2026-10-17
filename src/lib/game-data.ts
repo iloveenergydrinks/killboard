@@ -18,7 +18,18 @@
 //  - A cold instance costs six requests once, well inside the API's bucket of 60.
 
 const DEFAULT_API_URL = "https://api.thecitadel.com";
-const LISTS = ["items", "hulls", "npcs", "stats", "artifacts", "ciphers"] as const;
+const LISTS = [
+  "items",
+  "hulls",
+  "npcs",
+  "stats",
+  "artifacts",
+  "ciphers",
+  "ship-classes",
+  "ship-roles",
+  "death-causes",
+  "breach-tiers",
+] as const;
 type List = (typeof LISTS)[number];
 
 export const REVALIDATE_MS = 5 * 60 * 1000;
@@ -62,6 +73,16 @@ export type GameData = {
   artifacts: Map<string, Artifact>;
   ciphers: Map<string, Named>;
   stats: Stat[];
+  /** ShipClass in game order, each with its overlay mark. */
+  shipClasses: { name: string; art: ArtKeys | null }[];
+  /** The mark for a ship of no known class. */
+  unknownClassArt: ArtKeys | null;
+  /** ShipRole in game order, None left out. */
+  shipRoles: string[];
+  /** KillManifestDeathCause in game order. */
+  deathCauses: string[];
+  /** Breach tiers by index, with the names the game gives them. */
+  breachTiers: { index: number; name: string }[];
 };
 
 export const NO_GAME_DATA: GameData = {
@@ -72,6 +93,11 @@ export const NO_GAME_DATA: GameData = {
   artifacts: new Map(),
   ciphers: new Map(),
   stats: [],
+  shipClasses: [],
+  unknownClassArt: null,
+  shipRoles: [],
+  deathCauses: [],
+  breachTiers: [],
 };
 
 type Options = {
@@ -181,6 +207,12 @@ const absolute = (baseUrl: string, art: unknown): ArtKeys | null => {
   ) as ArtKeys;
 };
 
+/** A list of names, as the game orders them. */
+function strings(lists: Map<List, Cached>, list: List, key: string) {
+  const value = lists.get(list)!.body[key];
+  return Array.isArray(value) ? value.map(String) : [];
+}
+
 function index(lists: Map<List, Cached>, baseUrl: string): GameData {
   const rows = (list: List, key: string) =>
     ((lists.get(list)!.body[key] as Record<string, any>[] | undefined) ?? []).filter(
@@ -233,6 +265,17 @@ function index(lists: Map<List, Cached>, baseUrl: string): GameData {
         } as Npc,
       ]),
     ),
+    shipClasses: rows("ship-classes", "shipClasses").map((row) => ({
+      name: String(row.name),
+      art: absolute(baseUrl, row.art),
+    })),
+    unknownClassArt: absolute(baseUrl, lists.get("ship-classes")!.body.unknownArt as any),
+    shipRoles: strings(lists, "ship-roles", "shipRoles"),
+    deathCauses: strings(lists, "death-causes", "deathCauses"),
+    breachTiers: rows("breach-tiers", "breachTiers")
+      .map((row) => ({ index: Number(row.index), name: String(row.name) }))
+      .filter((tier) => Number.isInteger(tier.index))
+      .sort((a, b) => a.index - b.index),
     stats: rows("stats", "stats").map((row) => ({
       id: String(row.id),
       label: String(row.label),

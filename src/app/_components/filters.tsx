@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { KillboardArt } from "#/lib/art-server";
 import { filterHref } from "#/lib/filters.mjs";
 import { Art, Chevron } from "./components";
-import { formatCause, tierLabel } from "./format";
+import { formatCause } from "./format";
 
 export type Filters = {
   zone?: string;
@@ -29,9 +29,9 @@ export type FilterOptions = {
   hulls: { name: string; def: string | null }[];
   classes: string[];
   causes: string[];
+  tiers: { index: number; name: string }[];
 };
 
-const TIERS = [0, 1, 2, 3, 4, 5];
 // Filters the quick chips and the hull strip already show; the rest open the full form.
 const QUICK = new Set(["kind", "size", "hull", "sort", "cursor"]);
 
@@ -191,9 +191,9 @@ export function FilterBar({
           name="tier"
           label="Tier"
           value={filters.tier}
-          options={TIERS.map((tier) => [
-            String(tier),
-            `Tier ${tierLabel(tier)}`,
+          options={options.tiers.map((tier) => [
+            String(tier.index),
+            tier.name,
           ])}
         />
         <Select

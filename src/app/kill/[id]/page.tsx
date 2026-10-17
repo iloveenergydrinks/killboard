@@ -130,7 +130,7 @@ function KillView({
             <Link href={pilotHref(victim.pilotId)}>{victim.name}</Link>
           </h1>
           <div className="kb-record-hull">
-            {hull.class ? (
+            {hull.class && art.shipClass(hull.class) ? (
               <img className="kb-class-icon" src={art.shipClass(hull.class)} alt={hull.class} />
             ) : null}
             <Link href={hullHref(hull.name)} className="kb-console">

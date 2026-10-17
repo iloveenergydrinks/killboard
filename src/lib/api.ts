@@ -267,9 +267,6 @@ function battleRow(battle: BattleSummary) {
 // ── Reads ────────────────────────────────────────────────────────────────────────────────────
 
 export const WINDOWS = { week: 7, month: 30, all: null } as const;
-const CLASSES = ["Frigate", "Cruiser", "Dreadnought"];
-// KillManifestDeathCause, as the API names them.
-const CAUSES = ["Unspecified", "BreachCollapse", "ReconnectLoss", "ReactorStarvation"];
 
 type Filters = Record<string, string | number | undefined | null>;
 
@@ -299,17 +296,12 @@ export async function killTotals(filters: Filters) {
 }
 
 /**
- * The values the filter form offers. The API lists no zones of its own, so the zones are those the
- * all-time leaderboard ranks; ships come from the game data (art.hullGroups).
+ * The zones the filter form offers. The API lists no zones of its own, so they are those the
+ * all-time leaderboard ranks; classes, causes, tiers and ships come from the game data.
  */
-export async function filterOptions() {
+export async function filterZones() {
   const boards = await get<Leaderboards>("/v1/leaderboards", { window: "all" });
-  return {
-    zones: (boards?.deadliestZones ?? []).map((row) => row.zone.name).sort(),
-    hulls: [] as { name: string; def: string | null }[],
-    classes: CLASSES,
-    causes: CAUSES,
-  };
+  return (boards?.deadliestZones ?? []).map((row) => row.zone.name).sort();
 }
 
 /** A ship's or a zone's record: losses, value lost, pilots, average rating, PvP and top killers. */
